@@ -10,8 +10,6 @@ from kan import *
 # from learner.learner import KQNetwork as leaner_KQN
 # from target.target import KQNetwork as target_KQN
 
-  
-
 # Hyperparameters
 GAMMA = 0.99
 EPS_START = 1.0
@@ -26,10 +24,11 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Define KAN
 class KQNetwork():
-  def __init__(self, state_size:int, actions_size:int):
+  def __init__(self, inp:int, out:int):
     self.version_a = 0
     self.version_b = 0
-    self.model = KAN(width = [state_size, 10, actions_size], grid = 5, k = 10, seed = 1, device=DEVICE)
+    self.model = KAN(width = [inp, 128, 64, 2], grid = 5, k = 10, seed = 1, device=DEVICE)
+    print("created object of KQNetwork")
 
 class KANAgent():
   def __init__(self, state_size, action_size):
@@ -39,7 +38,7 @@ class KANAgent():
     self.eps = EPS_START
     self.model = KQNetwork(state_size, action_size)
     self.target_model = KQNetwork(state_size, action_size)
-    self.target_model.model = KAN.loadckpt('./model/'+ str(self.model.version_a) + '.' + str(self.model.version_b))
+    self.target_model.model = KAN.loadckpt(f'./model/{self.model.version_a}.{self.model.version_b}')
     self.target_model.model.eval()
   
   def select_action(self, state):
@@ -65,15 +64,21 @@ class KANAgent():
     states = torch.tensor(batch[0], dtype = torch.float32).to(DEVICE)
     actions = torch.tensor(batch[1]).unsqueeze(1).to(DEVICE)
     rewards = torch.tensor(batch[2]).to(DEVICE)
+    rewards = torch.reshape(rewards, (BATCH_SIZE, 1))
     next_states = torch.tensor(batch[3]).to(DEVICE)
     dones = torch.tensor(batch[4]).to(DEVICE)
     
     q_values = self.model.model(states).gather(1, actions)
     next_q_values = self.target_model.model(next_states).max(1)[0].unsqueeze(1)
-    target_q_values = rewards + (GAMMA * next_q_values)
-      
+    # print(next_q_values.shape)
+    # print((GAMMA*next_q_values).shape)
+    # print(rewards.shape)
+    target_q_values = torch.add(rewards, next_q_values, alpha=GAMMA)
+    
+    # print(states.shape)
+    # print(target_q_values.shape)
     dataset = create_dataset_from_data(states, target_q_values, device=DEVICE)
-    self.model.model.fit(dataset, opt="LBFGS", steps = 1, lamb = 0.01)
+    self.model.model.fit(dataset, opt="LBFGS", steps = 1, lamb = 0.001)
     self.model.version_b += 1
     loss = nn.MSELoss()(q_values, target_q_values)
     # self.optimizer.zero_grad()
@@ -249,10 +254,11 @@ if __name__ == "__main__":
   if model_type == 'MLP':
     agent = DQNAgent(state_size=4, action_size=2)  # Adjust state_size and action_size as needed
     agent.model.load_state_dict(torch.load("dqn_cartpole.pth"))
+    agent.model.to(DEVICE)
   else:
     agent = KANAgent(state_size=4, action_size=2)
-    agent.model = KAN.loadckpt('./model/'+ a + '.' + b)
-  agent.model.to(DEVICE)
+    agent.model = KAN.loadckpt(f'./model/{a}.{b}')
+    agent.model.model.to(DEVICE)
 
   # Test the trained agent
   scores_test = test_network(agent, n_episodes=100)

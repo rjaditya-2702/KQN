@@ -27,6 +27,17 @@ dataset = create_dataset_from_data(x, y, device='cpu')
 dataset['train_input'].shape, dataset['train_label'].shape
 
 # train the model
-model = KAN(width=[4,5,2], grid=5, k=3, seed=1, device=device)
+
+out = 2
+inp = 4
+model = KAN(width=[inp,5,out], grid=5, k=3, seed=1, device=device)
 model.fit(dataset, opt="LBFGS", steps=20, lamb=0.01);
 model.plot()
+
+
+x = torch.rand(1,4)
+print(x)
+y = model(x)
+print(y)
+print(y.max(1)[1].item())
+print(y.max(1)[0].unsqueeze(1))
