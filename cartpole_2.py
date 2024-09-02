@@ -27,7 +27,7 @@ class KQNetwork():
   def __init__(self, inp:int, out:int):
     self.version_a = 0
     self.version_b = 0
-    self.model = KAN(width = [inp, 128, 64, 2], grid = 5, k = 10, seed = 1, device=DEVICE)
+    self.model = KAN(width = [inp, 8, 2], grid = 50, k = 100, seed = 1, device=DEVICE)
     print("created object of KQNetwork")
 
 class KANAgent():
@@ -69,7 +69,8 @@ class KANAgent():
     dones = torch.tensor(batch[4]).to(DEVICE)
     
     q_values = self.model.model(states).gather(1, actions)
-    next_q_values = self.target_model.model(next_states).max(1)[0].unsqueeze(1)
+    with torch.no_grad():
+      next_q_values = self.target_model.model(next_states).max(1)[0].unsqueeze(1)
     # print(next_q_values.shape)
     # print((GAMMA*next_q_values).shape)
     # print(rewards.shape)
@@ -78,9 +79,11 @@ class KANAgent():
     # print(states.shape)
     # print(target_q_values.shape)
     dataset = create_dataset_from_data(states, target_q_values, device=DEVICE)
-    self.model.model.fit(dataset, opt="LBFGS", steps = 1, lamb = 0.001)
+    self.model.model.fit(dataset, opt="Adam", steps = 10, lamb = LR)
     self.model.version_b += 1
     loss = nn.MSELoss()(q_values, target_q_values)
+    print(f"Loss = {loss}")
+    print()
     # self.optimizer.zero_grad()
     # loss.backward()
     # self.optimizer.step()
